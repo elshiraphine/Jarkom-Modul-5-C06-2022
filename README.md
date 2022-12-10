@@ -366,3 +366,128 @@ Ping ke WISE secara bersamaan
 
 ##### Pada saat yang ke-3 mengakses node yang sama, maka akan ditolak.
 ![Testing No.3_4](assets/testing/3_4.jpg)
+
+### 4.	Akses menuju Web Server hanya diperbolehkan disaat jam kerja yaitu Senin sampai Jumat pada pukul 07.00 - 16.00.
+#### Garden dan SSS
+```
+iptables -A INPUT -m time --timestart 07:00 --timestop 16:00 --weekdays Mon,Tue,Wed,Thu,Fri -j ACCEPT
+iptables -A INPUT -j REJECT
+```
+#### Keterangan:
+- `A INPUT :` Menggunakan chain INPUT
+- `m time :` Menggunakan rule time
+- `weekdays Mon,Tue,Wed,Thu,Fri:` Melimitasi hanya untuk weekdays (Senin-Jumat)
+- `timestart 07:00 :` Mendefinisikan waktu mulai yaitu 07:00
+- `timestop 16:00 :` Mendefinisikan waktu berhenti yaitu 16:00
+- `j REJECT :` Paket ditolak
+
+#### Testing
+Lakukan command `ping 192.182.0.19` (IP SSS) pada node Forger, Desmond, Blackbell, maupun Briar dengan konfigurasi waktu yang berbeda.
+- Hari Senin jam 10 pagi: `date -s "5 Dec 2022 10:00:00"`
+![Testing No.4-Senin jam 10 pagi](assets/testing/4_2.jpg)
+- Hari Senin jam 9 malam: `date -s "5 Dec 2022 21:00:00"`
+![Testing No.4-Senin jam 9 malam](assets/testing/4_3.jpg)
+
+### 5.	Karena kita memiliki 2 Web Server, Loid ingin Ostania diatur sehingga setiap request dari client yang mengakses Garden dengan port 80 akan didistribusikan secara bergantian pada SSS dan Garden secara berurutan dan request dari client yang mengakses SSS dengan port 443 akan didistribusikan secara bergantian pada Garden dan SSS secara berurutan.
+#### Eden
+- Membuat konfigurasi berikut pada file `/etc/bind/named.conf.options`:
+```
+echo '
+options {
+        directory "/var/cache/bind";
+        forwarders {
+                192.168.122.1;
+        };
+        // dnssec-validation auto;
+        allow-query{any;};
+        auth-nxdomain no;    # conform to RFC1035
+        listen-on-v6 { any; };
+};
+' > /etc/bind/named.conf.options
+```
+
+#### Ostania
+Masukkan perintah:
+```
+iptables -A PREROUTING -t nat -p tcp -d 192.182.0.19 --dport 80 -m statistic --mode nth --every 2 --packet 0 -j DNAT --to-destination 192.182.0.19:80
+iptables -A PREROUTING -t nat -p tcp -d 192.182.0.19 --dport 80 -j DNAT --to-destination 192.182.0.18:80
+iptables -A PREROUTING -t nat -p tcp -d 192.182.0.18 --dport 443 -m statistic --mode nth --every 2 --packet 0 -j DNAT --to-destination 192.182.0.18:443
+iptables -A PREROUTING -t nat -p tcp -d 192.182.0.18 --dport 443 -j DNAT --to-destination 192.182.0.19:443
+```
+
+#### Garden
+- Marker Garden pada file index.html
+```
+echo 'Garden' > '/var/www/html/index.html'
+```
+```
+echo 'Listen 80
+Listen 443' > '/etc/apache2/ports.conf'
+```
+
+#### SSS
+- Marker SSS pada file index.html
+```
+echo 'SSS' > '/var/www/html/index.html'
+```
+```
+echo 'Listen 80
+Listen 443' > '/etc/apache2/ports.conf'
+```
+
+#### Testing
+##### SSS
+- Pada Client (ex: Briar), jalankan perintah `curl 192.182.0.19`
+Hasil:
+![Testing No.5-SSS](assets/testing/5_2.jpg)
+##### Garden
+- Pada Client (ex: Briar), jalankan perintah `curl 192.182.0.18`
+Hasil:
+![Testing No.5-Garden](assets/testing/5_1.jpg)
+
+
+### 6.	Karena Loid ingin tau paket apa saja yang di-drop, maka di setiap node server dan router ditambahkan logging paket yang di-drop dengan standard syslog level.
+1. Pada setiap node server maupun router tambahkan command berikut pada file `/root/syslog.sh`:
+    ```
+    # logging
+    iptables -N LOGGING
+    iptables -A INPUT -j LOGGING
+    iptables -A OUTPUT -j LOGGING
+    iptables -A LOGGING -m limit --limit 2/min -j LOG --log-prefix "IPTables-Droppe$
+    iptables -A LOGGING -j DROP
+
+    # rsyslog
+    echo '
+    kern.warning /var/log/iptables.log
+    ' >> /etc/rsyslog.conf
+
+    # rsyslog restart
+    /etc/init.d/rsyslog restart
+    ```
+2. Pada file `.bashrc` tambahkan command berikut: `bash /root/syslog.sh`
+
+#### Testing
+- Kirim paket dari node lain ke web server seperti Garden (untuk melakukan testing drop dari rule firewall yang sudah dibuat)
+Pada Forger, kirim paket dengan command `ping 192.182.0.18`
+- Cek UCP TCP dengan command berikut pada client:
+    ```
+    nmap -sU 192.182.0.12 -p 443
+    nmap -sT www.google.com -p 443
+    ```
+- Testing terhadap beberapa jenis waktu dengan beberapa kasus berikut:
+    - Hari Senin jam 10 pagi: `date -s "5 Dec 2022 10:00:00"`
+    - Hari Senin jam 9 malam: `date -s "5 Dec 2022 21:00:00"`
+    - Hari Minggu jam 10 pagi: `date -s "4 Dec 2022 10:00:00"`
+    - Hari Minggu jam 9 malam: `date -s "4 Dec 2022 21:00:00"`
+- Cek apache html dengan command berikut pada web server ():
+    ```
+    curl ip:80
+    curl ip:443
+    ```
+- Clear iptables dan chain di node yang telah dipasang firewall:
+    ```
+    iptables -F
+    iptables -X
+    ```
+- Jalankan perintah berikut untuk melihat logging drop dari iptables yang tercatat sistem log: `cat /var/log/iptables.log`
+![Testing No.6](assets/testing/6.jpg)
