@@ -345,7 +345,7 @@ iptables -A INPUT -p icmp -m connlimit --connlimit-above 2
 - `A INPUT:` Menggunakan chain INPUT
 - `p icmp:` Mendefinisikan protokol yang digunakan, yaitu ICMP (ping)
 - `m connlimit:` Menggunakan rule connection limit
-- `connlimit-above 2:` Limit yang ditangkap paket adalah di atas 3
+- `connlimit-above 2:` Limit yang ditangkap paket adalah di atas 2
 - `connlimit-mask 0 :` Hanya memperbolehkan 2 koneksi setiap subnet dalam satu waktu
 - `j DROP:` Paket di-drop
 
