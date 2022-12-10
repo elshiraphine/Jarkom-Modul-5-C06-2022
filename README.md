@@ -353,15 +353,15 @@ iptables -A INPUT -p icmp -m connlimit --connlimit-above 2
 Ping ke WISE secara bersamaan
 
 ##### Westalis
-`ping 192.182.0.12`
+`ping 192.182.0.12` <br />
 ![Testing No.3_1](assets/testing/3_1.jpg)
 
 ##### Briar
-`ping 192.182.0.12`
+`ping 192.182.0.12` <br />
 ![Testing No.3_2](assets/testing/3_2.jpg)
 
 ##### Strix
-`ping 192.182.0.12`
+`ping 192.182.0.12` <br />
 ![Testing No.3_3](assets/testing/3_3.jpg)
 
 ##### Pada saat yang ke-3 mengakses node yang sama, maka akan ditolak.
