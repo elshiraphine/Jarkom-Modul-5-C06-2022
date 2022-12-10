@@ -290,3 +290,79 @@ subnet 192.182.1.0 netmask 255.255.255.0 {
     max-lease-time 7200;
 ```
 7. Lakukan restart di node yang dijadikan ip dhcp
+
+### 1.	Agar topologi yang kalian buat dapat mengakses keluar, kalian diminta untuk mengkonfigurasi Strix menggunakan iptables, tetapi Loid tidak ingin menggunakan MASQUERADE.
+#### Strix
+Command yang digunakan `iptables -t nat -A POSTROUTING -o eth0 -j SNAT -s 192.182.0.0/21 --to-source 192.168.122.2` (ip eth0) yang menyesuaikan dari eth0 tersebut
+
+Lalu, pada semua node yang terkait, jalankan command berikut:
+```
+echo '
+nameserver 192.168.122.1
+' > /etc/resolv.conf
+```
+
+Keterangan:
+- IP eth0 akan selalu berganti ketika restart node pada Strix atau restart GNS3 dengan rentang IP yang sudah dijelaskan 
+- Cara mengetahui eth0, masukan command `ip a` pada Strix
+
+#### Testing
+Lakukan `ping google.com` pada sembarang node selain DHCP, misal pada Forger.
+![Testing No.1](assets/testing/1.png)
+
+### 2.	Kalian diminta untuk melakukan drop semua TCP dan UDP dari luar Topologi kalian pada server yang merupakan DHCP Server demi menjaga keamanan.
+#### Strix
+```
+iptables -A FORWARD -d 192.182.0.12 -i eth0 -p tcp -j DROP
+iptables -A FORWARD -d 192.182.0.12 -i eth0 -p udp -j DROP
+```
+
+#### Keterangan:
+- `A FORWARD:` Menggunakan chain FORWARD
+- `p tcp:` Mendefinisikan protokol yang digunakan, yaitu tcp
+- `p udp:` Mendefinisikan protokol yang digunakan, yaitu udp
+- `d 192.182.0.12:` Mendefinisikan alamat tujuan dari paket (DHCP) berada pada subnet 192.182.0.12
+- `i eth0:` Paket masuk dari eth0 Strix
+- `j DROP:` Paket di-drop
+
+#### Testing
+1. Install netcat di server WISE dan Eden: `apt-get install netcat`
+2. Pada WISE dan Eden ketikkan: `nc -l -p 80`
+3. Pada WISE ketikkan: `nmap -p 80 192.182.0.12`
+![Testing No.2](assets/testing/2.png)
+
+4. Testing dengan command `nmap -sU -p 67 192.182.0.12`:
+![Testing No.2](assets/testing/2_2.jpg)
+
+### 3.	Loid meminta kalian untuk membatasi DHCP dan DNS Server hanya boleh menerima maksimal 2 koneksi ICMP secara bersamaan menggunakan iptables, selebihnya didrop.
+#### WISE dan Eden 
+- Pada file `/root/iptables.sh`:
+```
+iptables -A INPUT -p icmp -m connlimit --connlimit-above 2 
+```
+
+#### Keterangan:
+- `A INPUT:` Menggunakan chain INPUT
+- `p icmp:` Mendefinisikan protokol yang digunakan, yaitu ICMP (ping)
+- `m connlimit:` Menggunakan rule connection limit
+- `connlimit-above 2:` Limit yang ditangkap paket adalah di atas 3
+- `connlimit-mask 0 :` Hanya memperbolehkan 2 koneksi setiap subnet dalam satu waktu
+- `j DROP:` Paket di-drop
+
+#### Testing
+Ping ke WISE secara bersamaan
+
+##### Westalis
+`ping 192.182.0.12`
+![Testing No.3_1](assets/testing/3_1.jpg)
+
+##### Briar
+`ping 192.182.0.12`
+![Testing No.3_2](assets/testing/3_2.jpg)
+
+##### Strix
+`ping 192.182.0.12`
+![Testing No.3_3](assets/testing/3_3.jpg)
+
+##### Pada saat yang ke-3 mengakses node yang sama, maka akan ditolak.
+![Testing No.3_4](assets/testing/3_4.jpg)
