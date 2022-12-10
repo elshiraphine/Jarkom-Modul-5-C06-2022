@@ -328,10 +328,10 @@ iptables -A FORWARD -d 192.182.0.12 -i eth0 -p udp -j DROP
 #### Testing
 1. Install netcat di server WISE dan Eden: `apt-get install netcat`
 2. Pada WISE dan Eden ketikkan: `nc -l -p 80`
-3. Pada WISE ketikkan: `nmap -p 80 192.182.0.12`
+3. Pada WISE ketikkan: `nmap -p 80 192.182.0.12`: <br />
 ![Testing No.2](assets/testing/2.png)
 
-4. Testing dengan command `nmap -sU -p 67 192.182.0.12`:
+4. Testing dengan command `nmap -sU -p 67 192.182.0.12`: <br />
 ![Testing No.2](assets/testing/2_2.jpg)
 
 ### 3.	Loid meminta kalian untuk membatasi DHCP dan DNS Server hanya boleh menerima maksimal 2 koneksi ICMP secara bersamaan menggunakan iptables, selebihnya didrop.
